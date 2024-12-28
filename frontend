@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract ArtGallery {
+    struct Art {
+        string title;
+        string description;
+        string artist;
+        uint256 likes;
+        string comment;
+    }
+
+    uint256 private nextArtId = 0;
+    mapping(uint256 => Art) private artworks;
+
+    // Upload a new artwork
+    function uploadArtwork(string memory title, string memory description, string memory artist) public returns (uint256) {
+        uint256 artId = nextArtId;
+        nextArtId++;
+
+        artworks[artId] = Art({
+            title: title,
+            description: description,
+            artist: artist,
+            likes: 0,
+            comment: "default"
+        });
+
+        return artId;
+    }
+
+    // Get an artwork by its ID
+    function getArtwork(uint256 artId) public view returns (Art memory) {
+        require(artExists(artId), "Artwork does not exist.");
+        return artworks[artId];
+    }
+
+    // Like an artwork
+    function likeArtwork(uint256 artId) public returns (bool) {
+        if (artExists(artId)) {
+            artworks[artId].likes += 1;
+            return true;
+        }
+        return false;
+    }
+
+    // Add a comment to an artwork
+    function addComment(uint256 artId, string memory comment) public returns (bool) {
+        if (artExists(artId)) {
+            artworks[artId].comment = comment;
+            return true;
+        }
+        return false;
+    }
+
+    // Delete an artwork
+    function deleteArtwork(uint256 artId) public returns (bool) {
+        if (artExists(artId)) {
+            delete artworks[artId];
+            return true;
+        }
+        return false;
+    }
+
+    // Check if an artwork exists
+    function artExists(uint256 artId) internal view returns (bool) {
+        return bytes(artworks[artId].title).length > 0;
+    }
+}
