@@ -1,0 +1,149 @@
+require("dotenv").config();
+const express = require("express");
+const bodyParser = require("body-parser");
+const Web3 = require("web3");
+
+// Web3 ve Akıllı Sözleşme Ayarları
+const web3 = new Web3(new Web3.providers.HttpProvider(process.env.RPC_URL)); // RPC URL
+const contractAddress = process.env.CONTRACT_ADDRESS; // Sözleşme adresi
+const privateKey = process.env.PRIVATE_KEY; // Kullanıcı cüzdanının özel anahtarı
+const account = web3.eth.accounts.wallet.add(privateKey); // Hesabı ekle
+
+// Sözleşme ABI
+const contractABI = [
+  {
+    "inputs": [
+      { "internalType": "string", "name": "title", "type": "string" },
+      { "internalType": "string", "name": "description", "type": "string" },
+      { "internalType": "string", "name": "artist", "type": "string" }
+    ],
+    "name": "uploadArtwork",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "artId", "type": "uint256" }],
+    "name": "getArtwork",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "string", "name": "title", "type": "string" },
+          { "internalType": "string", "name": "description", "type": "string" },
+          { "internalType": "string", "name": "artist", "type": "string" },
+          { "internalType": "uint256", "name": "likes", "type": "uint256" },
+          { "internalType": "string", "name": "comment", "type": "string" }
+        ],
+        "internalType": "struct ArtGallery.Art",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "artId", "type": "uint256" }],
+    "name": "likeArtwork",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "artId", "type": "uint256" },
+      { "internalType": "string", "name": "comment", "type": "string" }
+    ],
+    "name": "addComment",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "artId", "type": "uint256" }],
+    "name": "deleteArtwork",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+];
+
+const contract = new web3.eth.Contract(contractABI, contractAddress);
+
+// Express.js Uygulaması
+const app = express();
+app.use(bodyParser.json());
+
+// 1. Yeni Sanat Eseri Yükleme
+app.post("/artworks", async (req, res) => {
+  const { title, description, artist } = req.body;
+  try {
+    const tx = await contract.methods.uploadArtwork(title, description, artist).send({
+      from: account.address,
+      gas: 3000000
+    });
+    res.json({ success: true, artId: tx.events.ArtId.returnValues[0] });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 2. Sanat Eseri Bilgilerini Alma
+app.get("/artworks/:id", async (req, res) => {
+  const artId = req.params.id;
+  try {
+    const artwork = await contract.methods.getArtwork(artId).call();
+    res.json({ success: true, artwork });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 3. Sanat Eserine Beğeni Ekleme
+app.post("/artworks/:id/like", async (req, res) => {
+  const artId = req.params.id;
+  try {
+    await contract.methods.likeArtwork(artId).send({
+      from: account.address,
+      gas: 3000000
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 4. Sanat Eserine Yorum Ekleme
+app.post("/artworks/:id/comment", async (req, res) => {
+  const artId = req.params.id;
+  const { comment } = req.body;
+  try {
+    await contract.methods.addComment(artId, comment).send({
+      from: account.address,
+      gas: 3000000
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 5. Sanat Eserini Silme
+app.delete("/artworks/:id", async (req, res) => {
+  const artId = req.params.id;
+  try {
+    await contract.methods.deleteArtwork(artId).send({
+      from: account.address,
+      gas: 3000000
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Sunucuyu Başlatma
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
